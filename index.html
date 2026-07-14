@@ -1,0 +1,584 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lektion 28 – Interaktív Gyakorló</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/js/all.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+
+  <style>
+    body{
+      background: linear-gradient(135deg,#7c3aed,#3b82f6);
+      min-height:100vh;
+      font-family: Inter, sans-serif;
+    }
+    .glass{
+      background: rgba(255,255,255,.15);
+      backdrop-filter: blur(16px);
+      border:1px solid rgba(255,255,255,.2);
+    }
+    .option{
+      transition:.25s;
+    }
+    .option:hover{
+      transform:translateY(-2px);
+    }
+    .correct{
+      background:#16a34a !important;
+      color:white !important;
+      animation:pulseCorrect .6s;
+    }
+    .wrong{
+      background:#dc2626 !important;
+      color:white !important;
+    }
+    .bounceXP{
+      animation:bounceXP .7s;
+    }
+    .shake{
+      animation:shake .45s;
+    }
+    .fire-lost{
+      filter:grayscale(1);
+      animation:shake .4s;
+    }
+    @keyframes pulseCorrect{
+      0%{transform:scale(1);}
+      50%{transform:scale(1.05);}
+      100%{transform:scale(1);}
+    }
+    @keyframes bounceXP{
+      0%,100%{transform:translateY(0);}
+      30%{transform:translateY(-10px);}
+      60%{transform:translateY(4px);}
+    }
+    @keyframes shake{
+      0%,100%{transform:translateX(0);}
+      20%{transform:translateX(-6px);}
+      40%{transform:translateX(6px);}
+      60%{transform:translateX(-4px);}
+      80%{transform:translateX(4px);}
+    }
+  </style>
+</head>
+<body class="text-white flex items-center justify-center p-4">
+
+<div class="w-full max-w-4xl">
+
+    <!-- Header -->
+    <div class="glass rounded-3xl p-4 mb-4">
+        <div class="flex flex-wrap justify-between gap-4">
+
+            <div>
+                <div class="text-sm opacity-80">Kérdés</div>
+                <div id="questionCounter" class="font-bold text-xl">1/18</div>
+            </div>
+
+            <div>
+                <div class="text-sm opacity-80">Tapasztalat (XP)</div>
+                <div id="xpDisplay" class="font-bold text-xl">0 XP</div>
+            </div>
+
+            <div>
+                <div class="text-sm opacity-80">Pontszám</div>
+                <div id="scoreDisplay" class="font-bold text-xl">0</div>
+            </div>
+
+            <div>
+                <div class="text-sm opacity-80">🔥 Hossz</div>
+                <div id="streakDisplay" class="font-bold text-xl">0</div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Warning -->
+    <div id="warningBanner" class="hidden mb-4 bg-yellow-500 text-black font-bold rounded-xl p-3 text-center">
+        Gondolkodj, mielőtt kattintasz!
+    </div>
+
+    <!-- Main Card -->
+    <div id="quizCard" class="glass rounded-3xl p-6 md:p-8">
+
+        <!-- Timer -->
+        <div class="w-full bg-white/20 rounded-full h-4 mb-6 overflow-hidden">
+            <div id="timerBar" class="h-4 bg-emerald-400 transition-all"></div>
+        </div>
+
+        <div id="questionCategory" class="uppercase text-xs tracking-widest opacity-70 mb-2"></div>
+
+        <h2 id="questionText" class="text-2xl font-bold mb-6"></h2>
+
+        <div id="optionsContainer" class="grid gap-3"></div>
+
+        <div id="feedback" class="hidden mt-5 font-bold text-lg"></div>
+
+        <button
+            id="nextBtn"
+            class="hidden mt-6 w-full bg-violet-600 hover:bg-violet-700 rounded-2xl py-3 font-bold">
+            Következő kérdés
+        </button>
+
+    </div>
+
+    <!-- Result -->
+    <div id="resultScreen" class="hidden glass rounded-3xl p-8 text-center">
+
+        <h1 class="text-4xl font-bold mb-6">
+            🎉 Teszt vége
+        </h1>
+
+        <div class="grid md:grid-cols-3 gap-4 mb-6">
+
+            <div class="bg-white/10 rounded-xl p-4">
+                <div class="text-sm opacity-80">Végeredmény</div>
+                <div id="finalScore" class="text-3xl font-bold"></div>
+            </div>
+
+            <div class="bg-white/10 rounded-xl p-4">
+                <div class="text-sm opacity-80">Legjobb széria</div>
+                <div id="bestStreak" class="text-3xl font-bold"></div>
+            </div>
+
+            <div class="bg-white/10 rounded-xl p-4">
+                <div class="text-sm opacity-80">Összegyűjtött XP</div>
+                <div id="finalXP" class="text-3xl font-bold"></div>
+            </div>
+
+        </div>
+
+        <div id="resultMessage" class="text-2xl font-bold mb-6"></div>
+
+        <button
+            onclick="location.reload()"
+            class="bg-emerald-500 hover:bg-emerald-600 px-8 py-3 rounded-2xl font-bold">
+            Újraindítás
+        </button>
+
+    </div>
+
+</div>
+
+<script>
+/*==================================================
+  SZERKESZTHETŐ KÉRDÉSBANK
+==================================================*/
+
+const quizData = [
+
+{
+category:"Személyes névmások",
+question:"Gehört ____ das Smartphone, Max?",
+options:["dir","mir","ihr","ihm"],
+answer:"dir"
+},
+{
+category:"Személyes névmások",
+question:"Nein, es gehört ____ nicht.",
+options:["mir","dir","ihr","uns"],
+answer:"mir"
+},
+{
+category:"Személyes névmások",
+question:"Vielleicht gehört es ____.",
+options:["ihr","ihm","mir","euch"],
+answer:"ihr"
+},
+{
+category:"Személyes névmások",
+question:"Hat ____ unser Film gefallen, Herr Niemeyer?",
+options:["Ihnen","dir","euch","uns"],
+answer:"Ihnen"
+},
+{
+category:"Személyes névmások",
+question:"Sie haben ____ sehr geholfen.",
+options:["uns","euch","mir","ihnen"],
+answer:"uns"
+},
+{
+category:"Személyes névmások",
+question:"Und wie geht es ____ heute?",
+options:["euch","uns","dir","ihnen"],
+answer:"euch"
+},
+
+{
+category:"Névelők és főnevek",
+question:"Der Hamburger schmeckt ____ sehr.",
+options:["dem Kind","dem Mann","dem Opa","dem Enkel"],
+answer:"dem Kind"
+},
+{
+category:"Névelők és főnevek",
+question:"Zeig der Reporterin das ____.",
+options:["Portemonnaie","Moped","Handy","Buch"],
+answer:"Portemonnaie"
+},
+{
+category:"Névelők és főnevek",
+question:"Der Opa erklärt dem Enkel das ____.",
+options:["Moped","Portemonnaie","Auto","Radio"],
+answer:"Moped"
+},
+{
+category:"Névelők és főnevek",
+question:"Geben Sie dem Mann die ____ zurück.",
+options:["Tasche","Jacke","Zeitung","Brille"],
+answer:"Tasche"
+},
+
+{
+category:"dies-",
+question:"Mama, ich möchte aber ____ Spielzeug haben.",
+options:["dieses","diesen","dieser","diesem"],
+answer:"dieses"
+},
+{
+category:"dies-",
+question:"Warum schaust du ____ Touristen zu?",
+options:["diesen","dieser","diesem","dieses"],
+answer:"diesen"
+},
+{
+category:"dies-",
+question:"____ Bank ist besser.",
+options:["Diese","Diesen","Dieses","Diesem"],
+answer:"Diese"
+},
+{
+category:"dies-",
+question:"Ich möchte mal ____ Turm fotografieren.",
+options:["diesen","diesem","dieses","dieser"],
+answer:"diesen"
+},
+
+{
+category:"Szövegértés",
+question:"Es ____ ihm nicht gut.",
+options:["geht","springt"],
+answer:"geht"
+},
+{
+category:"Szövegértés",
+question:"Er hat sich ____.",
+options:["gewählt","verletzt"],
+answer:"verletzt"
+},
+{
+category:"Szövegértés",
+question:"Sein Bein tut weh und er ____.",
+options:["weint","joggt"],
+answer:"weint"
+},
+{
+category:"Szövegértés",
+question:"Sein Freund ____ ihn aber.",
+options:["füttert","tröstet"],
+answer:"tröstet"
+}
+
+];
+
+/*==================================================
+  STATE
+==================================================*/
+
+let currentQuestion=0;
+let score=0;
+let xp=0;
+let streak=0;
+let bestStreak=0;
+let answered=false;
+
+const QUESTION_TIME=20;
+let timeLeft=QUESTION_TIME;
+let timer;
+let startTime;
+
+/*==================================================
+  DOM
+==================================================*/
+
+const questionText=document.getElementById("questionText");
+const optionsContainer=document.getElementById("optionsContainer");
+const feedback=document.getElementById("feedback");
+const nextBtn=document.getElementById("nextBtn");
+const questionCounter=document.getElementById("questionCounter");
+const scoreDisplay=document.getElementById("scoreDisplay");
+const xpDisplay=document.getElementById("xpDisplay");
+const streakDisplay=document.getElementById("streakDisplay");
+const timerBar=document.getElementById("timerBar");
+const warningBanner=document.getElementById("warningBanner");
+
+/*==================================================
+  TIMER
+==================================================*/
+
+function startTimer(){
+
+    clearInterval(timer);
+
+    timeLeft=QUESTION_TIME;
+    startTime=Date.now();
+
+    timerBar.style.width="100%";
+
+    timer=setInterval(()=>{
+
+        timeLeft--;
+
+        const percent=(timeLeft/QUESTION_TIME)*100;
+        timerBar.style.width=percent+"%";
+
+        if(timeLeft<=0){
+            clearInterval(timer);
+
+            if(!answered){
+                handleAnswer(null);
+            }
+        }
+
+    },1000);
+}
+
+/*==================================================
+  RENDER
+==================================================*/
+
+function renderQuestion(){
+
+    answered=false;
+
+    feedback.classList.add("hidden");
+    nextBtn.classList.add("hidden");
+
+    const q=quizData[currentQuestion];
+
+    questionCounter.textContent=
+    `${currentQuestion+1}/${quizData.length}`;
+
+    document.getElementById("questionCategory")
+        .textContent=q.category;
+
+    questionText.textContent=q.question;
+
+    optionsContainer.innerHTML="";
+
+    q.options.forEach(option=>{
+
+        const btn=document.createElement("button");
+
+        btn.className=
+        "option bg-white/10 hover:bg-white/20 p-4 rounded-2xl text-left font-semibold";
+
+        btn.textContent=option;
+
+        btn.onclick=()=>handleAnswer(option);
+
+        optionsContainer.appendChild(btn);
+
+    });
+
+    startTimer();
+}
+
+/*==================================================
+  ANSWER
+==================================================*/
+
+function handleAnswer(selected){
+
+    if(answered) return;
+    answered=true;
+
+    clearInterval(timer);
+
+    const q=quizData[currentQuestion];
+    const buttons=[...document.querySelectorAll(".option")];
+
+    const answerTime=(Date.now()-startTime)/1000;
+    const correct=selected===q.answer;
+
+    buttons.forEach(btn=>{
+
+        btn.disabled=true;
+
+        if(btn.textContent===q.answer){
+            btn.classList.add("correct");
+        }
+
+        if(
+            selected &&
+            btn.textContent===selected &&
+            selected!==q.answer
+        ){
+            btn.classList.add("wrong");
+        }
+
+    });
+
+    if(correct){
+
+        score++;
+
+        streak++;
+        bestStreak=Math.max(bestStreak,streak);
+
+        let gainedXP=100;
+
+        if(streak>=5){
+            gainedXP=Math.round(gainedXP*2);
+        }
+        else if(streak>=3){
+            gainedXP=Math.round(gainedXP*1.5);
+        }
+
+        gainedXP+=Math.max(0,timeLeft*3);
+
+        xp+=gainedXP;
+
+        feedback.textContent=
+        `✅ Helyes! +${gainedXP} XP`;
+
+        feedback.className=
+        "mt-5 font-bold text-lg text-green-300 bounceXP";
+
+    }else{
+
+        if(answerTime<2){
+            warningBanner.classList.remove("hidden");
+            setTimeout(()=>{
+                warningBanner.classList.add("hidden");
+            },2500);
+        }
+
+        streak=0;
+
+        streakDisplay.classList.add("fire-lost");
+
+        setTimeout(()=>{
+            streakDisplay.classList.remove("fire-lost");
+        },700);
+
+        document.getElementById("quizCard")
+            .classList.add("shake");
+
+        setTimeout(()=>{
+            document.getElementById("quizCard")
+            .classList.remove("shake");
+        },500);
+
+        feedback.textContent=
+        `❌ Helytelen! Helyes válasz: ${q.answer}`;
+
+        feedback.className=
+        "mt-5 font-bold text-lg text-red-300";
+    }
+
+    feedback.classList.remove("hidden");
+
+    updateHUD();
+
+    nextBtn.classList.remove("hidden");
+}
+
+/*==================================================
+  HUD
+==================================================*/
+
+function updateHUD(){
+
+    scoreDisplay.textContent=score;
+
+    xpDisplay.textContent=`${xp} XP`;
+
+    streakDisplay.textContent=streak;
+
+    xpDisplay.classList.add("bounceXP");
+
+    setTimeout(()=>{
+        xpDisplay.classList.remove("bounceXP");
+    },700);
+}
+
+/*==================================================
+  NEXT
+==================================================*/
+
+nextBtn.addEventListener("click",()=>{
+
+    currentQuestion++;
+
+    if(currentQuestion<quizData.length){
+        renderQuestion();
+    }else{
+        showResults();
+    }
+
+});
+
+/*==================================================
+  RESULTS
+==================================================*/
+
+function showResults(){
+
+    document.getElementById("quizCard")
+    .classList.add("hidden");
+
+    document.getElementById("resultScreen")
+    .classList.remove("hidden");
+
+    const percent=
+    Math.round((score/quizData.length)*100);
+
+    document.getElementById("finalScore")
+    .textContent=`${percent}%`;
+
+    document.getElementById("bestStreak")
+    .textContent=bestStreak;
+
+    document.getElementById("finalXP")
+    .textContent=xp;
+
+    let msg="";
+
+    if(percent>80){
+
+        msg="Kiváló munka! 🏆";
+
+        confetti({
+            particleCount:250,
+            spread:150,
+            origin:{y:0.6}
+        });
+
+    }else if(percent>=50){
+
+        msg="Szép volt, csak így tovább! 📈";
+
+    }else{
+
+        msg="Ne add fel, próbáld újra! 💪";
+
+    }
+
+    document.getElementById("resultMessage")
+        .textContent=msg;
+}
+
+/*==================================================
+  START
+==================================================*/
+
+updateHUD();
+renderQuestion();
+
+</script>
+
+</body>
+</html>
